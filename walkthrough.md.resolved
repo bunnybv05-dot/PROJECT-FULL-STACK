@@ -1,0 +1,68 @@
+# Walkthrough: Realtime Sync Engine — Errors Fixed
+
+## What Was Done
+
+All compilation errors in the Spring Boot realtime-sync-engine project have been resolved.
+`mvnw.cmd clean compile` now reports **BUILD SUCCESS** with 20 source files compiled.
+
+## Root Causes Found & Fixed
+
+### 1. All Java Source Files Were Missing
+The project had empty subdirectories but no Java code other than [RealtimeSyncEngineApplication.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/RealtimeSyncEngineApplication.java).
+All files were written from scratch:
+
+| Layer | Files Created |
+|---|---|
+| Entity | [User.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/entity/User.java), [Document.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/entity/Document.java), [SyncOperation.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/entity/SyncOperation.java) |
+| Repository | [UserRepository.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/repository/UserRepository.java), [DocumentRepository.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/repository/DocumentRepository.java), [SyncOperationRepository.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/repository/SyncOperationRepository.java) |
+| DTO | [RegisterRequest.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/dto/RegisterRequest.java), [LoginRequest.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/dto/LoginRequest.java), [AuthResponse.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/dto/AuthResponse.java) |
+| Config | [JwtUtil.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/config/JwtUtil.java), [JwtAuthFilter.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/config/JwtAuthFilter.java), [SecurityConfig.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/config/SecurityConfig.java), [WebSocketConfig.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/config/WebSocketConfig.java) |
+| Service | [UserService.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/service/UserService.java), [DocumentService.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/service/DocumentService.java) |
+| Controller | [AuthController.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/controller/AuthController.java), [DocumentController.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/controller/DocumentController.java) |
+| WebSocket | [DocumentWebSocketController.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/websocket/DocumentWebSocketController.java) |
+| CDC | [DebeziumCDCService.java](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/cdc/DebeziumCDCService.java) |
+
+### 2. Lombok Incompatible with Java 25
+The system runs **Java 25.0.2**. All released Lombok versions use `sun.misc.Unsafe::objectFieldOffset`
+which is terminally deprecated in Java 25, causing:
+```
+Fatal error compiling: java.lang.ExceptionInInitializerError: com.sun.tools.javac.code.TypeTag :: UNKNOWN
+```
+**Fix:** Removed Lombok from [pom.xml](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/pom.xml) entirely. Rewrote all files with explicit constructors,
+getters/setters, manual builder patterns, and `LoggerFactory.getLogger()`.
+
+### 3. JavaScript Bug in Frontend ([index.html](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/src/main/resources/static/index.html))
+In [loadDocument()](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/resources/static/js/index.html#370-408), the STOMP subscribe callback used [document](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/java/com/sync/engine/entity/SyncOperation.java#82-86) as the parameter name, which
+shadowed the global `window.document`, breaking all `getElementById()` calls inside it.
+**Fix:** Renamed parameter to `msg`.
+
+### 4. Frontend in Wrong Location
+The HTML was at [static/js/index.html](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/resources/static/js/index.html) instead of [static/index.html](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/src/main/resources/static/index.html).
+**Fix:** Created at the correct location.
+
+### 5. RabbitMQ + Debezium Startup Fixes
+Added to [application.properties](file:///c:/Users/BHAVESH/Downloads/realtime-sync-engine/realtime-sync-engine/src/main/resources/application.properties):
+```properties
+spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+debezium.enabled=false
+```
+
+### 6. Debezium Type Fix
+Switched `DebeziumEngine.create(Connect.class)` → `Json.class` to match `ChangeEvent<String, String>`.
+
+## Build Verification
+
+```
+[INFO] Compiling 20 source files with javac [debug parameters release 17] to target\classes
+[INFO] BUILD SUCCESS
+[INFO] Total time:  3.728 s
+```
+
+## To Run the Application
+
+1. Start PostgreSQL with database `sync_engine`, user `postgres`, password `postgres`
+2. From the project folder:
+   ```
+   .\mvnw.cmd spring-boot:run
+   ```
+3. Open: [http://localhost:8080](http://localhost:8080)

@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Sync Engine</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #a855f7;
+            --primary-dark: #9333ea;
+            --bg: #1a0a2e;
+            --sidebar-bg: #210d3a;
+            --card-bg: #2a1045;
+            --text: #f0e6ff;
+            --text-muted: #c084fc;
+            --border: #4a1a7a;
+            --success: #22c55e;
+            --danger: #f43f5e;
+            --warning: #f59e0b;
+            --shadow: 0 4px 24px rgba(168, 85, 247, 0.25);
+            --editor-bg: #1e0d38;
+        }
+
+        [data-theme="dark"] {
+            --bg: #0d0618;
+            --sidebar-bg: #130822;
+            --card-bg: #1a0d2e;
+            --text: #f5eeff;
+            --text-muted: #b57bee;
+            --border: #3b1260;
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
+            --editor-bg: #100720;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        /* ====== LOGIN PAGE ====== */
+        .login-page {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a0a2e 0%, #4a1a7a 50%, #7c3aed 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-card {
+            background: rgba(42, 16, 69, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(168, 85, 247, 0.3);
+            border-radius: 24px;
+            padding: 44px;
+            width: 420px;
+            box-shadow: 0 30px 80px rgba(168, 85, 247, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05);
+            animation: slideUp 0.4s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(30px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .login-logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .login-logo h1 {
+            font-size: 2em;
+            background: linear-gradient(135deg, #e879f9, #a855f7, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 800;
+        }
+
+        .login-logo p {
+            color: #c084fc;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: #c084fc;
+            margin-bottom: 7px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 13px 18px;
+            border: 1.5px solid rgba(168, 85, 247, 0.4);
+            border-radius: 50px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.2s;
+            outline: none;
+            background: rgba(255, 255, 255, 0.06);
+            color: #f0e6ff;
+        }
+
+        .form-group input::placeholder {
+            color: rgba(192, 132, 252, 0.5);
+        }
+
+        .form-group input:focus {
+            border-color: #a855f7;
+            background: rgba(168, 85, 247, 0.1);
+            box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 11px 22px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 700;
+            font-family: inherit;
+            transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+            letter-spacing: 0.02em;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #a855f7, #7c3aed);
+            color: white;
+            box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #c084fc, #a855f7);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(168, 85, 247, 0.5);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f43f5e, #e11d48);
+            color: white;
+            box-shadow: 0 4px 15px rgba(244, 63, 94, 0.35);
+        }
+
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #fb7185, #f43f5e);
+            transform: translateY(-2px);
+        }
+
+        .btn-ghost {
+            background: rgba(168, 85, 247, 0.1);
+            color: #c084fc;
+            border: 1.5px solid rgba(168, 85, 247, 0.35);
+        }
+
+        .btn-ghost:hover {
+            background: rgba(168, 85, 247, 0.2);
+            border-color: #a855f7;
+            color: #f0e6ff;
+        }
+
+        .btn-full {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .btn-sm {
+            padding: 6px 14px;
+            font-size: 12px;
+        }
+
+        /* ====== APP LAYOUT ====== */
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* TOPBAR */
+        .topbar {
+            background: linear-gradient(135deg, #2d0a5e 0%, #4c1d95 50%, #6d28d9 100%);
+            color: white;
+            padding: 0 24px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 20px rgba(109, 40, 217, 0.5);
+            border-bottom: 1px solid rgba(168, 85, 247, 0.25);
+            flex-shrink: 0;
+        }
+
+        .topbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.25em;
+            font-weight: 800;
+            background: linear-gradient(90deg, #e879f9, #c084fc, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .topbar-btn {
+            background: rgba(168, 85, 247, 0.15);
+            border: 1px solid rgba(168, 85, 247, 0.4);
+            color: #e9d5ff;
+            padding: 6px 16px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+            font-family: inherit;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .topbar-btn:hover {
+            background: rgba(168, 85, 247, 0.35);
+            border-color: #a855f7;
+            color: white;
+            transform: translateY(-1px);
+        }
+
+        .user-badge {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(124, 58, 237, 0.2));
+            border: 1px solid rgba(168, 85, 247, 0.4);
+            border-radius: 50px;
+            padding: 5px 14px 5px 6px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #e9d5ff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .user-avatar {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, #e879f9, #a855f7);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 800;
+            color: white;
+            box-shadow: 0 0 10px rgba(232, 121, 249, 0.4);
+        }
+
+        /* MAIN AREA */
+        .main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: 280px;
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            transition: background 0.3s;
+        }
+
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 12px;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .search-box input {
+            border: none;
+            background: transparent;
+            outline: none;
+            font-size: 13px;
+            font-family: inherit;
+            color: var(--text);
+            width: 100%;
+        }
+
+        .doc-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .doc-item {
+            padding: 11px 14px;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+            margin-bottom: 6px;
+            border: 1px solid transparent;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .doc-item:hover {
+            background: rgba(168, 85, 247, 0.12);
+            border-color: rgba(168, 85, 247, 0.3);
+            transform: translateX(3px);
+        }
+
+        .doc-item.active {
+            background: linear-gradient(135deg, #7c3aed, #a855f7);
+            color: white;
+            border-color: #a855f7;
+            box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+        }
+
+        .doc-item-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .doc-item-title {
+            font-size: 13px;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .doc-item-meta {
+            font-size: 11px;
+            opacity: 0.65;
+            margin-top: 2px;
+        }
+
+        .doc-delete {
+            opacity: 0;
+            background: rgba(244, 63, 94, 0.15);
+            border: none;
+            border-radius: 50px;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #fb7185;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .doc-item:hover .doc-delete {
+            opacity: 1;
+        }
+
+        .doc-item.active .doc-delete {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            opacity: 1;
+        }
+
+        /* STATS PANEL */
+        .stats-panel {
+            padding: 12px 14px;
+            border-top: 1px solid var(--border);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .stat-card:nth-child(1) {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(124, 58, 237, 0.15));
+            border-color: rgba(168, 85, 247, 0.3);
+        }
+
+        .stat-card:nth-child(2) {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(14, 165, 233, 0.1));
+            border-color: rgba(6, 182, 212, 0.3);
+        }
+
+        .stat-card:nth-child(3) {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(16, 185, 129, 0.1));
+            border-color: rgba(34, 197, 94, 0.3);
+        }
+
+        .stat-card:nth-child(4) {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(245, 158, 11, 0.1));
+            border-color: rgba(249, 115, 22, 0.3);
+        }
+
+        .stat-card {
+            border-radius: 16px;
+            padding: 12px 10px;
+            text-align: center;
+            border: 1px solid var(--border);
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .stat-card .val {
+            font-size: 1.5em;
+            font-weight: 800;
+            background: linear-gradient(135deg, #e879f9, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-card .lbl {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 3px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* EDITOR AREA */
+        .editor-wrap {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .editor-toolbar {
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(180deg, #210d3a 0%, #1a0a2e 100%);
+            gap: 10px;
+            flex-wrap: wrap;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .editor-toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .doc-title-display {
+            font-size: 1.1em;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .editor-toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .badge {
+            background: var(--primary);
+            color: white;
+            border-radius: 20px;
+            padding: 3px 10px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: var(--success);
+        }
+
+        .badge-warning {
+            background: var(--warning);
+            color: #333;
+        }
+
+        #editor {
+            flex: 1;
+            padding: 24px;
+            font-size: 15px;
+            line-height: 1.7;
+            border: none;
+            resize: none;
+            outline: none;
+            background: var(--editor-bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        /* STATUS BAR */
+        .statusbar {
+            padding: 7px 20px;
+            background: var(--card-bg);
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .statusbar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .statusbar-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .status-dot {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: 600;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .dot-green {
+            background: var(--success);
+            box-shadow: 0 0 6px var(--success);
+        }
+
+        .dot-red {
+            background: var(--danger);
+            box-shadow: 0 0 6px var(--danger);
+        }
+
+        /* EMPTY STATE */
+        .empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            gap: 12px;
+        }
+
+        .empty-state .icon {
+            font-size: 4em;
+        }
+
+        .empty-state p {
+            font-size: 15px;
+        }
+
+        /* TOAST */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: linear-gradient(135deg, #4c1d95, #7c3aed);
+            border: 1px solid rgba(168, 85, 247, 0.5);
+            color: #f0e6ff;
+            padding: 13px 22px;
+            border-radius: 50px;
+            font-size: 13px;
+            font-weight: 700;
+            box-shadow: 0 8px 30px rgba(168, 85, 247, 0.4);
+            transform: translateY(80px);
+            opacity: 0;
+            transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success {
+            background: var(--success);
+        }
+
+        .toast.error {
+            background: var(--danger);
+        }
+
+        /* MODAL */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 30px;
+            width: 380px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.2s ease;
+        }
+
+        .modal h3 {
+            margin-bottom: 12px;
+        }
+
+        .modal p {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .modal-btns {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            background: var(--bg);
+            color: var(--text);
+            outline: none;
+            margin-bottom: 16px;
+        }
+
+        .modal input:focus {
+            border-color: var(--primary);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 10px;
+        }
+
+        @media(max-width:700px) {
+            .sidebar {
+                width: 220px;
+            }
+
+            .topbar-brand span {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ====== TOAST ====== -->
+    <div class="toast" id="toast"></div>
+
+    <!-- ====== MODAL ====== -->
+    <div class="modal-overlay hidden" id="modalOverlay">
+        <div class="modal" id="modalBox">
+            <h3 id="modalTitle">Create Document</h3>
+            <p id="modalMsg">Enter a title for your new document.</p>
+            <input type="text" id="modalInput" placeholder="Document title...">
+            <div class="modal-btns">
+                <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" id="modalConfirm">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== LOGIN PAGE ====== -->
+    <div id="loginPage" class="login-page">
+        <div class="login-card">
+            <div class="login-logo">
+                <h1>📝 Sync Engine</h1>
+                <p>Real-time collaborative document editor</p>
+            </div>
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="loginUsername" placeholder="Enter username" value="Bhavesh">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="loginEmail" placeholder="Enter email" value="bunnybv05@gmail.com">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="loginPassword" placeholder="Enter password" value="bunnybv2005"
+                    onkeydown="if(event.key==='Enter') handleLogin()">
+            </div>
+            <button class="btn btn-primary btn-full" onclick="handleLogin()">🚀 Login / Register</button>
+            <p style="text-align:center;color:#aaa;font-size:12px;margin-top:14px;">
+                New user? Just fill in your details — account created automatically.
+            </p>
+        </div>
+    </div>
+
+    <!-- ====== MAIN APP ====== -->
+    <div id="appPage" class="app hidden">
+
+        <!-- TOPBAR -->
+        <div class="topbar">
+            <div class="topbar-brand">
+                <span>📝</span>
+                <span>Real-Time Sync Engine</span>
+            </div>
+            <div class="topbar-actions">
+                <select class="topbar-btn" id="themeSelect" onchange="applyTheme(this.value)" title="Color Theme"
+                    style="cursor:pointer;">
+                    <option value="default">🎨 Default</option>
+                    <option value="ocean">🌊 Ocean</option>
+                    <option value="forest">🌿 Forest</option>
+                    <option value="sunset">🌅 Sunset</option>
+                    <option value="rose">🌸 Rose</option>
+                </select>
+                <button class="topbar-btn" onclick="toggleDarkMode()" id="themeBtn">🌙 Dark</button>
+                <button class="topbar-btn" onclick="toggleZen()" id="zenBtn" title="Zen/Focus Mode">🧘 Zen</button>
+                <button class="topbar-btn" onclick="showShortcuts()" title="Keyboard Shortcuts">⌨️</button>
+                <div class="user-badge">
+                    <div class="user-avatar" id="userAvatar">?</div>
+                    <span id="userNameDisplay">User</span>
+                </div>
+                <button class="topbar-btn" onclick="logout()">🚪 Logout</button>
+            </div>
+        </div>
+
+        <!-- MAIN -->
+        <div class="main">
+
+            <!-- SIDEBAR -->
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <div class="search-box">
+                        <span>🔍</span>
+                        <input type="text" id="searchInput" placeholder="Search documents..."
+                            oninput="filterDocuments()">
+                    </div>
+                    <button class="btn btn-primary btn-full" onclick="showCreateModal()">
+                        ➕ New Document
+                    </button>
+                </div>
+                <div class="doc-list" id="docList">
+                    <p style="color:var(--text-muted);text-align:center;padding:20px;font-size:13px;">No documents yet
+                    </p>
+                </div>
+                <div class="stats-panel">
+                    <div class="stat-card">
+                        <div class="val" id="statDocs">0</div>
+                        <div class="lbl">Documents</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="val" id="statEdits">0</div>
+                        <div class="lbl">Edits Made</div>
+                    </div>
+                    <div class="stat-card" style="grid-column:1/-1">
+                        <div class="val" id="statWords">0</div>
+                        <div class="lbl">Words in Current Doc</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EDITOR -->
+            <div class="editor-wrap">
+                <!-- No document selected -->
+                <div class="empty-state" id="emptyState">
+                    <div class="icon">📄</div>
+                    <p>Select a document from the sidebar to start editing</p>
+                    <button class="btn btn-primary" onclick="showCreateModal()">➕ Create your first document</button>
+                </div>
+
+                <!-- Document editor -->
+                <div id="editorContainer" class="hidden"
+                    style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+                    <div class="editor-toolbar">
+                        <div class="editor-toolbar-left">
+                            <span class="doc-title-display" id="currentDocTitle">Untitled</span>
+                            <span class="badge" id="versionBadge">v0</span>
+                            <button class="btn btn-ghost btn-sm" onclick="renameDocument()" title="Rename document">✏️
+                                Rename</button>
+                        </div>
+                        <div class="editor-toolbar-right">
+                            <button class="btn btn-ghost btn-sm" onclick="changeFontSize(-1)"
+                                title="Decrease font size">A-</button>
+                            <button class="btn btn-ghost btn-sm" onclick="changeFontSize(1)"
+                                title="Increase font size">A+</button>
+                            <button class="btn btn-ghost btn-sm" onclick="toggleFindReplace()"
+                                title="Find & Replace (Ctrl+F)">🔍 Find</button>
+                            <button class="btn btn-ghost btn-sm" onclick="copyContent()" title="Copy all text">📋
+                                Copy</button>
+                            <button class="btn btn-ghost btn-sm" onclick="downloadDocument()"
+                                title="Download as .txt">⬇️ Save</button>
+                            <button class="btn btn-ghost btn-sm" onclick="printDocument()"
+                                title="Print / Export PDF">🖨️ Print</button>
+                            <button class="btn btn-ghost btn-sm" onclick="toggleFullscreen()" id="fsBtn"
+                                title="Fullscreen">⛶</button>
+                            <button class="btn btn-ghost btn-sm" onclick="clearEditor()" title="Clear content">🗑️
+                                Clear</button>
+                        </div>
+                    </div>
+
+                    <!-- Toolbar Row 2 -->
+                    <div class="editor-toolbar"
+                        style="border-top:1px solid var(--border);padding:6px 16px;gap:6px;flex-wrap:wrap;">
+                        <select class="btn btn-ghost btn-sm" onchange="insertTemplate(this.value)"
+                            title="Insert Template" style="cursor:pointer;">
+                            <option value="">📋 Templates</option>
+                            <option value="meeting">Meeting Notes</option>
+                            <option value="todo">TODO List</option>
+                            <option value="report">Report</option>
+                            <option value="journal">Daily Journal</option>
+                            <option value="code">Code Snippet</option>
+                        </select>
+                        <select class="btn btn-ghost btn-sm" onchange="convertCase(this.value)" title="Case Converter"
+                            style="cursor:pointer;">
+                            <option value="">🔤 Case</option>
+                            <option value="upper">UPPERCASE</option>
+                            <option value="lower">lowercase</option>
+                            <option value="title">Title Case</option>
+                            <option value="sentence">Sentence case</option>
+                        </select>
+                        <select class="btn btn-ghost btn-sm" onchange="exportAs(this.value)" title="Export"
+                            style="cursor:pointer;">
+                            <option value="">📤 Export</option>
+                            <option value="txt">As .txt</option>
+                            <option value="html">As .html</option>
+                            <option value="md">As .md</option>
+                        </select>
+                        <button class="btn btn-ghost btn-sm" onclick="toggleWordWrap()" id="wrapBtn"
+                            title="Toggle Word Wrap">↩ Wrap</button>
+                        <button class="btn btn-ghost btn-sm" onclick="backupToLocal()"
+                            title="Backup to Browser Storage">💾 Backup</button>
+                        <button class="btn btn-ghost btn-sm" onclick="restoreBackup()" title="Restore from Backup">↩️
+                            Restore</button>
+                        <button class="btn btn-ghost btn-sm" onclick="insertDate()" title="Insert Current Date/Time">📅
+                            Date</button>
+                        <button class="btn btn-ghost btn-sm" onclick="sortSidebar()" title="Sort documents A→Z">🔃
+                            Sort</button>
+                        <span id="readingTime" style="font-size:12px;color:var(--text-muted);margin-left:auto;">~0 min
+                            read</span>
+                    </div>
+
+                    <!-- Word Goal Bar -->
+                    <div id="goalBar"
+                        style="padding:4px 16px;background:var(--sidebar-bg);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);">
+                        🎯 Goal:
+                        <input id="goalInput" type="number" min="1" max="100000" value="500"
+                            style="width:65px;padding:2px 6px;border:1px solid var(--border);border-radius:5px;font-size:12px;background:var(--card-bg);color:var(--text);outline:none;"
+                            onchange="updateGoal()">
+                        words &nbsp;
+                        <div style="flex:1;background:var(--border);border-radius:10px;height:6px;overflow:hidden;">
+                            <div id="goalProgress"
+                                style="height:100%;background:var(--primary);border-radius:10px;width:0%;transition:width 0.3s;">
+                            </div>
+                        </div>
+                        <span id="goalPct">0%</span>
+                    </div>
+
+                    <!-- Find & Replace panel -->
+                    <div id="findPanel" class="hidden" style="
+                        display:flex; align-items:center; gap:8px; padding:8px 16px;
+                        background:var(--sidebar-bg); border-bottom:1px solid var(--border);
+                        flex-wrap:wrap;">
+                        <input id="findInput" type="text" placeholder="Find..."
+                            style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--card-bg);color:var(--text);outline:none;width:160px;">
+                        <input id="replaceInput" type="text" placeholder="Replace..."
+                            style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--card-bg);color:var(--text);outline:none;width:160px;">
+                        <button class="btn btn-primary btn-sm" onclick="doReplace(false)">Replace Next</button>
+                        <button class="btn btn-primary btn-sm" onclick="doReplace(true)">Replace All</button>
+                        <span id="findCount" style="font-size:12px;color:var(--text-muted);"></span>
+                        <button class="btn btn-ghost btn-sm" onclick="toggleFindReplace()">✕ Close</button>
+                    </div>
+
+                    <textarea id="editor" placeholder="Start typing your document here...
+Real-time sync is active — changes are broadcast to all connected users instantly."></textarea>
+
+                    <div class="statusbar">
+                        <div class="statusbar-left">
+                            <span class="status-dot" id="connStatus">
+                                <span class="dot dot-red" id="connDot"></span>
+                                <span id="connLabel">Disconnected</span>
+                            </span>
+                            <span id="syncLabel">Ready</span>
+                        </div>
+                        <div class="statusbar-right">
+                            <span id="lineCount">L1</span>
+                            <span id="charCount">0 chars</span>
+                            <span id="lastSaved">—</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ====== State ======
+        let stompClient = null;
+        let currentUser = null;
+        let currentDoc = null;
+        let currentVersion = 0;
+        let isConnected = false;
+        let typingTimer = null;
+        let allDocuments = [];
+        let editCount = 0;
+        let darkMode = false;
+
+        // ====== Toast ======
+        function toast(msg, type = 'success') {
+            const el = document.getElementById('toast');
+            el.textContent = (type === 'success' ? '✅ ' : type === 'error' ? '❌ ' : 'ℹ️ ') + msg;
+            el.className = 'toast show ' + type;
+            setTimeout(() => { el.className = 'toast'; }, 3000);
+        }
+
+        // ====== Dark Mode ======
+        function toggleDarkMode() {
+            darkMode = !darkMode;
+            document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : '');
+            document.getElementById('themeBtn').textContent = darkMode ? '☀️ Light Mode' : '🌙 Dark Mode';
+            localStorage.setItem('darkMode', darkMode);
+        }
+        if (localStorage.getItem('darkMode') === 'true') toggleDarkMode();
+
+        // ====== Modal ======
+        let modalCallback = null;
+        function showModal(title, msg, placeholder, cb) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMsg').textContent = msg;
+            document.getElementById('modalInput').placeholder = placeholder;
+            document.getElementById('modalInput').value = '';
+            document.getElementById('modalOverlay').classList.remove('hidden');
+            document.getElementById('modalConfirm').onclick = () => {
+                const val = document.getElementById('modalInput').value.trim();
+                if (val) { closeModal(); cb(val); }
+            };
+            setTimeout(() => document.getElementById('modalInput').focus(), 100);
+        }
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.add('hidden');
+        }
+        function showCreateModal() {
+            showModal('📄 New Document', 'Give your document a name.', 'e.g. Meeting Notes...', createDocument);
+        }
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+        // ====== Login ======
+        async function handleLogin() {
+            const username = document.getElementById('loginUsername').value.trim();
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            if (!username || !email || !password) { toast('Please fill all fields', 'error'); return; }
+
+            try {
+                let res = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+                if (!res.ok) {
+                    res = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+                    if (!res.ok) { toast(await res.text(), 'error'); return; }
+                }
+                const data = await res.json();
+                handleAuthSuccess(data);
+            } catch (e) {
+                toast('Connection error. Is the server running?', 'error');
+            }
+        }
+
+        function handleAuthSuccess(data) {
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+            currentUser = data.user;
+
+            // Update UI
+            const name = currentUser.username || currentUser.email || 'User';
+            document.getElementById('userNameDisplay').textContent = name;
+            document.getElementById('userAvatar').textContent = name.charAt(0).toUpperCase();
+
+            document.getElementById('loginPage').classList.add('hidden');
+            document.getElementById('appPage').classList.remove('hidden');
+
+            connectWebSocket();
+            loadDocuments();
+            toast('Welcome, ' + name + '!');
+        }
+
+        // ====== WebSocket ======
+        function connectWebSocket() {
+            const socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            stompClient.debug = null;
+
+            stompClient.connect({}, function () {
+                isConnected = true;
+                setConnStatus(true);
+                stompClient.subscribe('/topic/document.updates', function (update) {
+                    handleIncomingOp(JSON.parse(update.body));
+                });
+            }, function () {
+                isConnected = false;
+                setConnStatus(false);
+                setTimeout(connectWebSocket, 5000);
+            });
+        }
+
+        function setConnStatus(connected) {
+            document.getElementById('connDot').className = 'dot ' + (connected ? 'dot-green' : 'dot-red');
+            document.getElementById('connLabel').textContent = connected ? 'Connected' : 'Disconnected';
+        }
+
+        // ====== Documents ======
+        async function loadDocuments() {
+            try {
+                const res = await fetch('/api/documents', {
+                    headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+                });
+                if (!res.ok) throw new Error();
+                allDocuments = await res.json();
+                renderDocList(allDocuments);
+                document.getElementById('statDocs').textContent = allDocuments.length;
+            } catch (e) {
+                toast('Failed to load documents', 'error');
+            }
+        }
+
+        function filterDocuments() {
+            const q = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = allDocuments.filter(d => d.title.toLowerCase().includes(q));
+            renderDocList(filtered);
+        }
+
+        function renderDocList(docs) {
+            const list = document.getElementById('docList');
+            if (!docs.length) {
+                list.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;font-size:13px;">No documents found</p>';
+                return;
+            }
+            list.innerHTML = docs.map(doc => `
+            <div class="doc-item ${currentDoc === doc.id ? 'active' : ''}" id="ditem-${doc.id}" onclick="loadDocument(${doc.id})">
+                <div class="doc-item-info">
+                    <div class="doc-item-title">📄 ${escHtml(doc.title)}</div>
+                    <div class="doc-item-meta">v${doc.version || 0} · ${formatDate(doc.updatedAt || doc.createdAt)}</div>
+                </div>
+                <button class="doc-delete btn-sm" onclick="event.stopPropagation(); deleteDocument(${doc.id}, '${escHtml(doc.title)}')" title="Delete">🗑️</button>
+            </div>
+        `).join('');
+        }
+
+        function loadDocument(docId) {
+            if (!isConnected) { toast('Not connected to server', 'error'); return; }
+            currentDoc = docId;
+
+            // Update sidebar
+            document.querySelectorAll('.doc-item').forEach(el => el.classList.remove('active'));
+            const item = document.getElementById('ditem-' + docId);
+            if (item) item.classList.add('active');
+
+            // Show editor
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('editorContainer').classList.remove('hidden');
+            document.getElementById('editor').value = '';
+            document.getElementById('syncLabel').textContent = 'Loading...';
+
+            stompClient.send('/app/document.get', {}, JSON.stringify({ documentId: docId }));
+            stompClient.subscribe('/queue/document.' + docId, function (msg) {
+                const doc = JSON.parse(msg.body);
+                document.getElementById('editor').value = doc.content || '';
+                document.getElementById('currentDocTitle').textContent = doc.title;
+                document.getElementById('versionBadge').textContent = 'v' + (doc.version || 0);
+                currentVersion = doc.version || 0;
+                updateCounts();
+                document.getElementById('syncLabel').textContent = 'Synced';
+            });
+
+            stompClient.send('/app/document.sync', {}, JSON.stringify({ documentId: docId, lastVersion: 0 }));
+        }
+
+        async function createDocument(title) {
+            try {
+                const res = await fetch('/api/documents', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + localStorage.getItem('token')
+                    },
+                    body: JSON.stringify({ title })
+                });
+                if (!res.ok) throw new Error();
+                const doc = await res.json();
+                toast('Document created!');
+                await loadDocuments();
+                loadDocument(doc.id);
+            } catch (e) {
+                toast('Failed to create document', 'error');
+            }
+        }
+
+        async function deleteDocument(id, title) {
+            if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+            try {
+                const res = await fetch('/api/documents/' + id, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+                });
+                if (res.ok || res.status === 204 || res.status === 405) {
+                    allDocuments = allDocuments.filter(d => d.id !== id);
+                    renderDocList(allDocuments);
+                    document.getElementById('statDocs').textContent = allDocuments.length;
+                    if (currentDoc === id) {
+                        currentDoc = null;
+                        document.getElementById('emptyState').classList.remove('hidden');
+                        document.getElementById('editorContainer').classList.add('hidden');
+                    }
+                    toast('Document deleted');
+                } else {
+                    toast('Server does not support delete yet', 'error');
+                }
+            } catch (e) {
+                toast('Delete failed', 'error');
+            }
+        }
+
+        // ====== Editing ======
+        document.getElementById('editor').addEventListener('input', function (e) {
+            if (!currentDoc) return;
+            updateCounts();
+            document.getElementById('syncLabel').textContent = 'Typing...';
+            if (typingTimer) clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => sendEdit(e.target.value), 600);
+        });
+
+        function sendEdit(content) {
+            if (!stompClient || !isConnected || !currentDoc) return;
+            stompClient.send('/app/document.edit', {}, JSON.stringify({
+                type: 'UPDATE',
+                entity: 'DOCUMENT',
+                documentId: currentDoc,
+                data: content,
+                userId: currentUser ? currentUser.id.toString() : '1',
+                timestamp: Date.now(),
+                version: currentVersion + 1
+            }));
+            editCount++;
+            document.getElementById('statEdits').textContent = editCount;
+            document.getElementById('syncLabel').textContent = 'Saved';
+            document.getElementById('lastSaved').textContent = 'Saved ' + new Date().toLocaleTimeString();
+        }
+
+        function handleIncomingOp(operation) {
+            if (operation.documentId !== currentDoc) return;
+            if (operation.userId === (currentUser ? currentUser.id.toString() : '1')) return;
+            if (operation.type === 'UPDATE') {
+                document.getElementById('editor').value = operation.data;
+                currentVersion = operation.version;
+                document.getElementById('versionBadge').textContent = 'v' + currentVersion;
+                updateCounts();
+                toast('📡 Remote update received', 'info');
+            }
+        }
+
+        // ====== Toolbar Actions ======
+        function copyContent() {
+            const text = document.getElementById('editor').value;
+            navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard!'));
+        }
+
+        function downloadDocument() {
+            const title = document.getElementById('currentDocTitle').textContent || 'document';
+            const content = document.getElementById('editor').value;
+            const blob = new Blob([content], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = title.replace(/[^a-z0-9]/gi, '_') + '.txt';
+            a.click();
+            toast('Downloaded as .txt!');
+        }
+
+        function clearEditor() {
+            if (!confirm('Clear all content in this document?')) return;
+            document.getElementById('editor').value = '';
+            sendEdit('');
+            updateCounts();
+        }
+
+        // ====== NEW FEATURES ======
+
+        // ---- Rename Document ----
+        function renameDocument() {
+            if (!currentDoc) { toast('No document selected', 'error'); return; }
+            const current = document.getElementById('currentDocTitle').textContent;
+            showModal('✏️ Rename Document', 'Enter a new title for this document.', current, async (newTitle) => {
+                try {
+                    // PATCH /api/documents/{id} with new title
+                    const res = await fetch('/api/documents/' + currentDoc, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + localStorage.getItem('token')
+                        },
+                        body: JSON.stringify({ title: newTitle })
+                    });
+                    // Update UI regardless (server may not have PATCH yet)
+                    document.getElementById('currentDocTitle').textContent = newTitle;
+                    const item = document.getElementById('ditem-' + currentDoc);
+                    if (item) item.querySelector('.doc-item-title').textContent = '📄 ' + newTitle;
+                    const doc = allDocuments.find(d => d.id === currentDoc);
+                    if (doc) doc.title = newTitle;
+                    toast('Document renamed!');
+                } catch (e) {
+                    toast('Rename failed', 'error');
+                }
+            });
+        }
+
+        // ---- Font Size ----
+        let editorFontSize = 15;
+        function changeFontSize(delta) {
+            editorFontSize = Math.max(10, Math.min(32, editorFontSize + delta));
+            document.getElementById('editor').style.fontSize = editorFontSize + 'px';
+            toast('Font size: ' + editorFontSize + 'px');
+        }
+
+        // ---- Find & Replace ----
+        let findPanelOpen = false;
+        function toggleFindReplace() {
+            findPanelOpen = !findPanelOpen;
+            const panel = document.getElementById('findPanel');
+            if (findPanelOpen) {
+                panel.classList.remove('hidden');
+                panel.style.display = 'flex';
+                document.getElementById('findInput').focus();
+                document.getElementById('findInput').oninput = () => highlightFind();
+            } else {
+                panel.classList.add('hidden');
+                panel.style.display = 'none';
+                document.getElementById('findCount').textContent = '';
+            }
+        }
+        function highlightFind() {
+            const q = document.getElementById('findInput').value;
+            if (!q) { document.getElementById('findCount').textContent = ''; return; }
+            const text = document.getElementById('editor').value;
+            const count = (text.match(new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')) || []).length;
+            document.getElementById('findCount').textContent = count + ' match' + (count === 1 ? '' : 'es');
+        }
+        function doReplace(all) {
+            const find = document.getElementById('findInput').value;
+            const replace = document.getElementById('replaceInput').value;
+            if (!find) return;
+            const editor = document.getElementById('editor');
+            if (all) {
+                const regex = new RegExp(find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+                const count = (editor.value.match(regex) || []).length;
+                editor.value = editor.value.replace(regex, replace);
+                sendEdit(editor.value);
+                updateCounts();
+                toast('Replaced ' + count + ' occurrence' + (count === 1 ? '' : 's'));
+            } else {
+                const idx = editor.value.toLowerCase().indexOf(find.toLowerCase(), editor.selectionEnd || 0);
+                if (idx === -1) { toast('No more matches', 'error'); return; }
+                editor.value = editor.value.substring(0, idx) + replace + editor.value.substring(idx + find.length);
+                editor.selectionStart = idx + replace.length;
+                editor.selectionEnd = idx + replace.length;
+                sendEdit(editor.value);
+                updateCounts();
+                toast('Replaced 1 occurrence');
+            }
+            highlightFind();
+        }
+        // Ctrl+F to open find panel
+        document.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f' && currentDoc) {
+                e.preventDefault();
+                if (!findPanelOpen) toggleFindReplace();
+            }
+        });
+
+        // ---- Print / Export PDF ----
+        function printDocument() {
+            const title = document.getElementById('currentDocTitle').textContent || 'Document';
+            const content = document.getElementById('editor').value;
+            const win = window.open('', '_blank');
+            win.document.write(`<!DOCTYPE html><html><head>
+                <title>${title}</title>
+                <style>
+                    body { font-family: 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.7;
+                           max-width: 800px; margin: 40px auto; padding: 20px; color: #333; }
+                    h1 { border-bottom: 2px solid #667eea; padding-bottom: 10px; color: #667eea; }
+                    pre { white-space: pre-wrap; word-wrap: break-word; }
+                </style>
+            </head><body>
+                <h1>${title}</h1>
+                <pre>${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+            </body></html>`);
+            win.document.close();
+            win.focus();
+            setTimeout(() => { win.print(); }, 500);
+            toast('Print dialog opened!');
+        }
+
+        // ---- Fullscreen ----
+        let isFullscreen = false;
+        function toggleFullscreen() {
+            const editor = document.getElementById('editorContainer');
+            isFullscreen = !isFullscreen;
+            if (isFullscreen) {
+                editor.style.cssText = 'position:fixed;inset:0;z-index:500;display:flex;flex-direction:column;background:var(--editor-bg);';
+                document.getElementById('fsBtn').textContent = '✕ Exit';
+                toast('Press ⛶ or Escape to exit fullscreen');
+            } else {
+                editor.style.cssText = 'display:flex;flex-direction:column;flex:1;overflow:hidden;';
+                document.getElementById('fsBtn').textContent = '⛶';
+            }
+        }
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && isFullscreen) toggleFullscreen();
+        });
+
+        // ====== Utils ======
+        function updateCounts() {
+            const text = document.getElementById('editor').value;
+            const words = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+            const lines = text === '' ? 1 : text.split('\n').length;
+            document.getElementById('charCount').textContent = text.length + ' chars';
+            document.getElementById('lineCount').textContent = 'L' + lines;
+            document.getElementById('statWords').textContent = words;
+            const rtEl = document.getElementById('readingTime');
+            if (rtEl) rtEl.textContent = '~' + Math.max(1, Math.ceil(words / 200)) + ' min read';
+            updateGoal(words);
+        }
+
+        // ====== FEATURES PACK 2 ======
+        // Color Themes
+        const THEMES = { default: ['#667eea', '#5a67d8'], ocean: ['#0ea5e9', '#0284c7'], forest: ['#22c55e', '#16a34a'], sunset: ['#f97316', '#ea580c'], rose: ['#ec4899', '#db2777'] };
+        function applyTheme(n) { const t = THEMES[n] || THEMES.default; document.documentElement.style.setProperty('--primary', t[0]); document.documentElement.style.setProperty('--primary-dark', t[1]); localStorage.setItem('colorTheme', n); toast('Theme: ' + n); }
+        const _ct = localStorage.getItem('colorTheme'); if (_ct) { applyTheme(_ct); const s = document.getElementById('themeSelect'); if (s) s.value = _ct; }
+
+        // Zen Mode
+        let zenMode = false;
+        function toggleZen() { zenMode = !zenMode; const sb = document.querySelector('.sidebar'), tb = document.querySelector('.topbar'); if (zenMode) { sb.style.display = 'none'; tb.style.display = 'none'; toast('Zen mode — Esc to exit'); } else { sb.style.display = ''; tb.style.display = ''; } const b = document.getElementById('zenBtn'); if (b) b.textContent = zenMode ? '🧘 Exit' : '🧘 Zen'; }
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && zenMode) toggleZen(); });
+
+        // Shortcuts
+        function showShortcuts() { const rows = [['Ctrl+F', 'Find & Replace'], ['Ctrl+S', 'Force Save'], ['Tab', '4-space indent'], ['Esc', 'Exit fullscreen/zen'], ['A- / A+', 'Font size'], ['🎨', 'Color theme'], ['🧘 Zen', 'Focus mode'], ['📋', 'Templates'], ['🔤', 'Case converter'], ['📅', 'Insert date'], ['💾', 'Backup locally'], ['📤', 'Export file'], ['⛶', 'Fullscreen']].map(([k, v]) => `<tr><td style="padding:5px 10px;font-weight:600;color:var(--primary)">${k}</td><td style="padding:5px 10px;color:var(--text-muted)">${v}</td></tr>`).join(''); document.getElementById('modalTitle').textContent = '⌨️ Shortcuts'; document.getElementById('modalMsg').innerHTML = `<table style="width:100%;border-collapse:collapse">${rows}</table>`; document.getElementById('modalInput').style.display = 'none'; document.getElementById('modalConfirm').style.display = 'none'; document.getElementById('modalOverlay').classList.remove('hidden'); }
+
+        // Templates
+        const TMPL = { meeting: 'MEETING NOTES\n=============\nDate: ' + new Date().toLocaleDateString() + '\nAttendees:\n\nAgenda:\n1.\n\nAction Items:\n[ ] \n\nNotes:\n', todo: 'TODO LIST\n=========\n[ ] Task 1\n[ ] Task 2\n[ ] Task 3\n', report: 'REPORT\n======\nTitle:\nAuthor:\n\nSummary:\n\nDetails:\n\nConclusion:\n', journal: 'DAILY JOURNAL\n' + '='.repeat(20) + '\nDate: ' + new Date().toLocaleDateString() + '\n\nMood:\nHighlight:\n\nThoughts:\n', code: 'CODE SNIPPET\n============\nLanguage:\n\n---\n\n' };
+        function insertTemplate(name) { if (!name || !currentDoc) return; const ed = document.getElementById('editor'), pos = ed.selectionStart; ed.value = ed.value.slice(0, pos) + (TMPL[name] || '') + ed.value.slice(pos); sendEdit(ed.value); updateCounts(); document.querySelectorAll('select').forEach(s => { if (s.value === name) s.value = ''; }); toast('Template inserted!'); }
+
+        // Case Converter
+        function convertCase(type) { if (!type || !currentDoc) return; const ed = document.getElementById('editor'); let t = ed.value; if (type === 'upper') t = t.toUpperCase(); else if (type === 'lower') t = t.toLowerCase(); else if (type === 'title') t = t.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()); else if (type === 'sentence') t = t.toLowerCase().replace(/(^\s*\w|[.!?]\s*\w)/g, c => c.toUpperCase()); ed.value = t; sendEdit(t); updateCounts(); document.querySelectorAll('select').forEach(s => { if (s.value === type) s.value = ''; }); toast('Case converted!'); }
+
+        // Export As
+        function exportAs(fmt) { if (!fmt || !currentDoc) return; const title = document.getElementById('currentDocTitle').textContent || 'doc', content = document.getElementById('editor').value, safe = title.replace(/[^a-z0-9]/gi, '_'); let blob, fn; if (fmt === 'txt') { blob = new Blob([content], { type: 'text/plain' }); fn = safe + '.txt'; } else if (fmt === 'html') { blob = new Blob(['<!DOCTYPE html><html><head><title>' + title + '</title><style>body{font-family:sans-serif;max-width:800px;margin:40px auto;line-height:1.7}pre{white-space:pre-wrap}</style></head><body><h1>' + title + '</h1><pre>' + content.replace(/</g, '&lt;') + '</pre></body></html>'], { type: 'text/html' }); fn = safe + '.html'; } else if (fmt === 'md') { blob = new Blob(['# ' + title + '\n\n' + content], { type: 'text/markdown' }); fn = safe + '.md'; } const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fn; a.click(); document.querySelectorAll('select').forEach(s => { if (s.value === fmt) s.value = ''; }); toast('Exported: ' + fn); }
+
+        // Word Wrap
+        let wordWrap = true;
+        function toggleWordWrap() { wordWrap = !wordWrap; const ed = document.getElementById('editor'); ed.style.whiteSpace = wordWrap ? 'pre-wrap' : 'pre'; const b = document.getElementById('wrapBtn'); b.style.background = wordWrap ? '' : 'var(--primary)'; b.style.color = wordWrap ? '' : 'white'; toast('Word wrap ' + (wordWrap ? 'ON' : 'OFF')); }
+
+        // Backup / Restore
+        function backupToLocal() { if (!currentDoc) return; localStorage.setItem('bak_' + currentDoc, JSON.stringify({ content: document.getElementById('editor').value, title: document.getElementById('currentDocTitle').textContent, time: new Date().toISOString() })); toast('Backup saved!'); }
+        function restoreBackup() { if (!currentDoc) return; const raw = localStorage.getItem('bak_' + currentDoc); if (!raw) { toast('No backup found', 'error'); return; } const bak = JSON.parse(raw); if (!confirm('Restore from ' + new Date(bak.time).toLocaleString() + '?')) return; document.getElementById('editor').value = bak.content; sendEdit(bak.content); updateCounts(); toast('Restored!'); }
+
+        // Insert Date
+        function insertDate() { if (!currentDoc) return; const ed = document.getElementById('editor'), pos = ed.selectionStart, s = new Date().toLocaleString(); ed.value = ed.value.slice(0, pos) + s + ed.value.slice(pos); ed.selectionStart = ed.selectionEnd = pos + s.length; sendEdit(ed.value); updateCounts(); toast('Date inserted!'); }
+
+        // Sort Sidebar
+        function sortSidebar() { allDocuments.sort((a, b) => a.title.localeCompare(b.title)); renderDocList(allDocuments); toast('Sorted A→Z'); }
+
+        // Word Goal
+        function updateGoal(wc) { const goal = parseInt(document.getElementById('goalInput')?.value) || 500; const words = wc !== undefined ? wc : 0; const pct = Math.min(100, Math.round(words / goal * 100)); const bar = document.getElementById('goalProgress'), pel = document.getElementById('goalPct'); if (bar) { bar.style.width = pct + '%'; bar.style.background = pct >= 100 ? 'var(--success)' : 'var(--primary)'; } if (pel) pel.textContent = pct >= 100 ? '✅ Goal!' : pct + '%'; }
+
+        // Tab key support
+        document.getElementById('editor').addEventListener('keydown', e => { if (e.key === 'Tab') { e.preventDefault(); const ed = document.getElementById('editor'), s = ed.selectionStart; ed.value = ed.value.slice(0, s) + '    ' + ed.value.slice(ed.selectionEnd); ed.selectionStart = ed.selectionEnd = s + 4; } });
+
+        // Ctrl+S
+        document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 's' && currentDoc) { e.preventDefault(); sendEdit(document.getElementById('editor').value); toast('Saved!'); } });
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            if (stompClient) stompClient.disconnect();
+            currentUser = null; currentDoc = null; allDocuments = []; editCount = 0;
+            document.getElementById('loginPage').classList.remove('hidden');
+            document.getElementById('appPage').classList.add('hidden');
+        }
+
+        function escHtml(str) {
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function formatDate(dt) {
+            if (!dt) return '';
+            try { return new Date(dt).toLocaleDateString(); } catch (e) { return ''; }
+        }
+
+        // Auto-login if token exists
+        window.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('token');
+            const user = localStorage.getItem('user');
+            if (token && user) {
+                handleAuthSuccess({ token, user: JSON.parse(user) });
+            }
+        });
+    </script>
+</body>
+
+</html>

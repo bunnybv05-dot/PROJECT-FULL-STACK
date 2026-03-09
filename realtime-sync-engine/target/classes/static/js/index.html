@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Sync Engine</title>
+    
+    <!-- Correct WebSocket Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .main-content {
+            display: flex;
+            min-height: 600px;
+        }
+        
+        .sidebar {
+            width: 300px;
+            background: #f8f9fa;
+            padding: 20px;
+            border-right: 1px solid #dee2e6;
+        }
+        
+        .editor-area {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .document-list {
+            list-style: none;
+            margin-top: 20px;
+        }
+        
+        .document-item {
+            padding: 12px 15px;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .document-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+        
+        .document-item.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+            width: 100%;
+        }
+        
+        .btn-primary:hover {
+            background: #5a67d8;
+        }
+        
+        #editor {
+            width: 100%;
+            height: 400px;
+            padding: 20px;
+            font-size: 16px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            resize: none;
+            margin-top: 20px;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+        
+        #editor:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            font-size: 14px;
+        }
+        
+        .status-connected {
+            color: #28a745;
+            font-weight: 600;
+        }
+        
+        .status-disconnected {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        
+        .user-count {
+            background: #667eea;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+        
+        .login-form {
+            max-width: 400px;
+            margin: 100px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .login-form h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .login-form input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .login-form input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .version-info {
+            color: #6c757d;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Form -->
+    <div id="loginContainer" class="login-form">
+        <h2>🔐 Login to Sync Engine</h2>
+        <input type="text" id="username" placeholder="Username" value="demo-user">
+        <input type="email" id="email" placeholder="Email" value="demo@example.com">
+        <input type="password" id="password" placeholder="Password" value="password">
+        <button class="btn btn-primary" onclick="handleLogin()">Login / Register</button>
+    </div>
+
+    <!-- Main Application -->
+    <div id="mainContainer" class="container hidden">
+        <div class="header">
+            <h1>📝 Real-Time Sync Engine</h1>
+            <p>Collaborative document editing with WebSocket</p>
+        </div>
+        
+        <div class="main-content">
+            <div class="sidebar">
+                <h3>📄 Documents</h3>
+                <button class="btn btn-primary" onclick="createDocument()" style="margin: 15px 0;">
+                    + New Document
+                </button>
+                <div id="documentList" class="document-list"></div>
+            </div>
+            
+            <div class="editor-area">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 id="currentDocTitle">Select a document</h3>
+                    <span class="user-count" id="userCount">0 users online</span>
+                </div>
+                <textarea id="editor" placeholder="Select a document to start editing..." disabled></textarea>
+                <div class="version-info" id="versionInfo">Version: 0</div>
+            </div>
+        </div>
+        
+        <div class="status-bar">
+            <div>
+                <span id="connectionStatus" class="status-disconnected">● Disconnected</span>
+            </div>
+            <div>
+                <span id="syncStatus">Ready</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== Configuration ====================
+        let stompClient = null;
+        let currentUser = null;
+        let currentDocument = null;
+        let currentDocumentVersion = 0;
+        let isConnected = false;
+        let typingTimer = null;
+
+        // ==================== Login/Register ====================
+        async function handleLogin() {
+            const username = document.getElementById('username').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                // Try to register
+                const registerResponse = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+
+                if (registerResponse.ok) {
+                    const data = await registerResponse.json();
+                    handleAuthSuccess(data);
+                } else {
+                    // Try login
+                    const loginResponse = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+                    
+                    if (loginResponse.ok) {
+                        const data = await loginResponse.json();
+                        handleAuthSuccess(data);
+                    } else {
+                        alert('Login failed: ' + await loginResponse.text());
+                    }
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                alert('Connection error. Is the backend running?');
+            }
+        }
+
+        function handleAuthSuccess(data) {
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+            
+            currentUser = data.user;
+            
+            document.getElementById('loginContainer').classList.add('hidden');
+            document.getElementById('mainContainer').classList.remove('hidden');
+            
+            connectWebSocket();
+            loadDocuments();
+        }
+
+        // ==================== WebSocket Connection ====================
+        function connectWebSocket() {
+            const socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            
+            // Disable debug logging
+            stompClient.debug = null;
+            
+            stompClient.connect({}, function(frame) {
+                isConnected = true;
+                document.getElementById('connectionStatus').textContent = '● Connected';
+                document.getElementById('connectionStatus').className = 'status-connected';
+                
+                // Subscribe to document updates
+                stompClient.subscribe('/topic/document.updates', function(update) {
+                    const operation = JSON.parse(update.body);
+                    handleIncomingOperation(operation);
+                });
+                
+                console.log('WebSocket connected');
+            }, function(error) {
+                isConnected = false;
+                document.getElementById('connectionStatus').textContent = '● Disconnected';
+                document.getElementById('connectionStatus').className = 'status-disconnected';
+                console.error('WebSocket error:', error);
+                
+                // Try to reconnect after 5 seconds
+                setTimeout(connectWebSocket, 5000);
+            });
+        }
+
+        // ==================== Document Operations ====================
+        async function loadDocuments() {
+            try {
+                const response = await fetch('/api/documents', {
+                    headers: {
+                        'Authorization': 'Bearer ' + localStorage.getItem('token')
+                    }
+                });
+                
+                if (!response.ok) throw new Error('Failed to load documents');
+                
+                const documents = await response.json();
+                renderDocumentList(documents);
+            } catch (error) {
+                console.error('Error loading documents:', error);
+            }
+        }
+
+        function renderDocumentList(documents) {
+            const list = document.getElementById('documentList');
+            list.innerHTML = '';
+            
+            documents.forEach(doc => {
+                const div = document.createElement('div');
+                div.className = 'document-item' + (currentDocument === doc.id ? ' active' : '');
+                div.innerHTML = `
+                    <span>${doc.title}</span>
+                    <small>v${doc.version || 0}</small>
+                `;
+                div.onclick = () => loadDocument(doc.id);
+                list.appendChild(div);
+            });
+        }
+
+        function loadDocument(docId) {
+            if (!stompClient || !isConnected) {
+                alert('Not connected to server');
+                return;
+            }
+            
+            currentDocument = docId;
+            
+            // Update active state in list
+            document.querySelectorAll('.document-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.closest('.document-item').classList.add('active');
+            
+            // Enable editor
+            document.getElementById('editor').disabled = false;
+            document.getElementById('editor').value = 'Loading...';
+            
+            // Request document via WebSocket
+            stompClient.send("/app/document.get", {}, JSON.stringify({
+                documentId: docId
+            }));
+            
+            // Subscribe to document queue
+            stompClient.subscribe('/queue/document.' + docId, function(document) {
+                const doc = JSON.parse(document.body);
+                document.getElementById('editor').value = doc.content || '';
+                document.getElementById('currentDocTitle').textContent = doc.title;
+                currentDocumentVersion = doc.version || 0;
+                document.getElementById('versionInfo').textContent = 'Version: ' + currentDocumentVersion;
+            });
+            
+            // Request sync
+            stompClient.send("/app/document.sync", {}, JSON.stringify({
+                documentId: docId,
+                lastVersion: 0
+            }));
+        }
+
+        async function createDocument() {
+            const title = prompt("Enter document title:");
+            if (!title) return;
+            
+            try {
+                const response = await fetch('/api/documents', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + localStorage.getItem('token')
+                    },
+                    body: JSON.stringify({ title: title })
+                });
+                
+                if (!response.ok) throw new Error('Failed to create document');
+                
+                const newDoc = await response.json();
+                loadDocuments(); // Refresh list
+                loadDocument(newDoc.id); // Open new document
+            } catch (error) {
+                console.error('Error creating document:', error);
+                alert('Failed to create document');
+            }
+        }
+
+        // ==================== Real-Time Editing ====================
+        document.getElementById('editor').addEventListener('input', function(e) {
+            if (!currentDocument) return;
+            
+            // Clear previous timer
+            if (typingTimer) clearTimeout(typingTimer);
+            
+            // Set new timer (debounce)
+            typingTimer = setTimeout(() => {
+                sendEdit(e.target.value);
+            }, 500);
+        });
+
+        function sendEdit(content) {
+            if (!stompClient || !isConnected || !currentDocument) return;
+            
+            const operation = {
+                type: "UPDATE",
+                entity: "DOCUMENT",
+                documentId: currentDocument,
+                data: content,
+                userId: currentUser ? currentUser.id.toString() : "1",
+                timestamp: Date.now(),
+                version: currentDocumentVersion + 1
+            };
+            
+            stompClient.send("/app/document.edit", {}, JSON.stringify(operation));
+        }
+
+        function handleIncomingOperation(operation) {
+            if (operation.documentId === currentDocument) {
+                const editor = document.getElementById('editor');
+                const currentContent = editor.value;
+                
+                // Only update if this is from another user
+                if (operation.userId !== (currentUser ? currentUser.id.toString() : "1")) {
+                    if (operation.type === 'UPDATE') {
+                        editor.value = operation.data;
+                        currentDocumentVersion = operation.version;
+                        document.getElementById('versionInfo').textContent = 'Version: ' + currentDocumentVersion;
+                    }
+                }
+            }
+        }
+
+        // ==================== Logout ====================
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            
+            if (stompClient) {
+                stompClient.disconnect();
+            }
+            
+            document.getElementById('loginContainer').classList.remove('hidden');
+            document.getElementById('mainContainer').classList.add('hidden');
+        }
+
+        // Add logout button to header (optional)
+        document.addEventListener('DOMContentLoaded', function() {
+            const header = document.querySelector('.header');
+            const logoutBtn = document.createElement('button');
+            logoutBtn.textContent = 'Logout';
+            logoutBtn.style.cssText = 'position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); border: 1px solid white; color: white; padding: 5px 15px; border-radius: 5px; cursor: pointer;';
+            logoutBtn.onclick = logout;
+            header.style.position = 'relative';
+            header.appendChild(logoutBtn);
+        });
+    </script>
+</body>
+</html>

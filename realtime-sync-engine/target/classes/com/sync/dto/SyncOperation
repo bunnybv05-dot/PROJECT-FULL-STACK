@@ -1,0 +1,15 @@
+package com.sync.engine.dto;
+
+import lombok.Data;
+
+@Data
+public class SyncOperation {
+    private String type;      // INSERT, UPDATE, DELETE
+    private String entity;     // DOCUMENT, OPERATION
+    private Long documentId;
+    private Object data;
+    private Long timestamp;
+    private Long version;
+    private String userId;
+    private Integer position;
+}
